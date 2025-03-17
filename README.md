@@ -20,21 +20,28 @@ cp .env.example .env
 
 The agent can be configured to pursue different goals using the `AGENT_GOAL` environment variable in your `.env` file.
 
-#### Goal: Find an event in Australia / New Zealand, book flights to it and invoice the user for the cost
-- `AGENT_GOAL=goal_event_flight_invoice` (default) - Helps users find events, book flights, and arrange train travel with invoice generation
-    - This is the scenario in the video above
+#### Music Creation Goals
 
-#### Goal: Find a Premier League match, book train tickets to it and invoice the user for the cost
+- `AGENT_GOAL=goal_simple_music` (default) - Helps users create simple MIDI musical sequences with a bubble-based visualization and playback interface
+
+#### Previous Goals (Legacy)
+
+- `AGENT_GOAL=goal_event_flight_invoice` - Helps users find events, book flights, and arrange train travel with invoice generation
 - `AGENT_GOAL=goal_match_train_invoice` - Focuses on Premier League match attendance with train booking and invoice generation
-    - This goal was part of [Temporal's Replay 2025 conference keynote demo](https://www.youtube.com/watch?v=YDxAWrIBQNE)
 
-If not specified, the agent defaults to `goal_event_flight_invoice`. Each goal comes with its own set of tools and conversation flows designed for specific use cases. You can examine `tools/goal_registry.py` to see the detailed configuration of each goal.
+If not specified, the agent defaults to `goal_simple_music`. Each goal comes with its own set of tools and conversation flows designed for specific use cases. You can examine `tools/goal_registry.py` to see the detailed configuration of each goal.
 
 See the next section for tool configuration for each goal.
 
 ### Tool Configuration
 
-#### Agent Goal: goal_event_flight_invoice (default)
+#### Music Creation Goals
+
+* No external API keys are required for the music creation goals
+* All tools use mock data to simulate the creation of music compositions and instrument searches
+* The `CreateInvoice` tool is still available if you want to use it, but it's not required for the music creation goals
+
+#### Agent Goal: goal_event_flight_invoice (legacy)
 * The agent uses a mock function to search for events. This has zero configuration.
 * By default the agent uses a mock function to search for flights.
     * If you want to use the real flights API, go to `tools/search_flights.py` and replace the `search_flights` function with `search_flights_real_api` that exists in the same file.

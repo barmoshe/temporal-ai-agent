@@ -1,87 +1,40 @@
 from models.tool_definitions import AgentGoal
 from tools.tool_registry import (
-    search_fixtures_tool,
-    search_flights_tool,
-    search_trains_tool,
-    book_trains_tool,
-    create_invoice_tool,
-    find_events_tool,
+    midi_creation_tool,
+    vanilla_tool,
 )
 
-goal_match_train_invoice = AgentGoal(
+# Define a single simple goal with our two tools
+goal_simple_music = AgentGoal(
     tools=[
-        search_fixtures_tool,
-        search_trains_tool,
-        book_trains_tool,
-        create_invoice_tool,
+        midi_creation_tool,
+        vanilla_tool,
     ],
-    description="The user wants to book a trip to a city in the UK around the dates of a premier league match. "
-    "Help the user find a premier league match to attend, search and book trains for that match and offers to invoice them for the cost of train tickets. "
-    "The user lives in London. "
-    "Gather args for these tools in order, ensuring you move the user from one tool to the next: "
-    "1. SearchFixtures: Search for fixtures for a team within a specified date range. The user might ask questions about the matches dates and locations to decide on where to go. "
-    "2. SearchTrains: Search for trains to the city of the match and list them for the customer to choose from "
-    "3. BookTrains: Book the train tickets, used to invoice the user for the cost of the train tickets "
-    "4. CreateInvoice: Invoices the user for the cost of train tickets, with total and details inferred from the conversation history ",
-    starter_prompt="Welcome me, give me a description of what you can do, then ask me for the details you need to begin your job as an agent ",
+    description="Help the user create simple musical sequences using MIDI or handle general-purpose requests. "
+    "Available tools: "
+    "1. MidiCreationTool: Convert a text representation of music into MIDI notes that can be played by the frontend. "
+    "2. VanillaTool: A fallback for general-purpose requests that don't fit other tools.",
+    starter_prompt="Welcome! I can help you create simple musical sequences using MIDI, or assist with general questions. What would you like to do today?",
     example_conversation_history="\n ".join(
         [
-            "user: I'd like to travel to a premier league match",
-            "agent: Sure! Let's start by finding a match you'd like to attend. I know about Premier League fixtures in the UK. Could you tell me which team and what date range you're interested in?"
-            "user: Wolves between mid-April and the first week of May, please."
-            "agent: Great! Let's find fixtures for Wolverhampton Wanderers FC between 2025-04-15 and 2025-05-05."
-            "user_confirmed_tool_run: <user clicks confirm on SearchFixtures tool, passing the full team name as an input>",
-            'tool_result: SearchFixtures responds in this JSON format and the results are parsed by the agent below {"fixtures": [{"awayTeam": "West Ham United FC","date": "2025-04-01","homeTeam": "Wolverhampton Wanderers FC"},...,'
-            "agent: I found 4 Wolves matches in May 2025: 1. Man City vs Wolves (Away) - May 3 2. Wolves vs Brighton (Home) - May 10 3. Crystal Palace vs Wolves (Away) - May 18 4. Wolves vs Brentford (Home) - May 25 Which match would you like to attend? I'll help you find trains from London.",
-            "user: How about the Man City match",
-            "agent: Great! Let's find trains to Manchester and back for the match.",
-            "user_confirmed_tool_run: <user clicks confirm on SearchTrains tool>",
-            'tool_result: SearchTrains responds in this JSON format and the results are parsed by the agent below: {"journeys": [{"arrival": "Manchester","arrival_time": "2025-04-18T12:11","departure": "London","departure_time": "2025-04-18T11:00","id": "T8049","platform": "1","price": 73.5,"type": "outbound"},',
-            "agent: I found several train options for your journey to Manchester including outbound options on May 9 at 11am, 3:30pm and 4:30pm and return options on May 11 at 9am, 11am and 1pm. Which trains would you like to book?",
-            "user: I'd like the 11am outbound and 3:30pm return",
-            "agent: Sounds good, let's book train tickets for the 11am outbound and 3:30pm return trains on May 9 and May 11, one day before and after the match.",
-            "user_confirmed_tool_run: <user clicks confirm on BookTrains tool>",
-            'tool_result: BookTrains responds in this JSON format and the results are parsed by the agent belowg [{"booking_reference": "BR10879","journey_id": "T9532,T1027","status": "confirmed"}]',
-            "agent: Your train tickets have been booked with the reference ABCD1234. Are you ready to be invoiced for the total cost of the train tickets?",
-            "user: Yes, pelase invoice me.",
-            "user_confirmed_tool_run: <user clicks confirm on CreateInvoice tool which includes details of the train journey, the match, and the total cost>",
-            'tool_result: CreateInvoice responds in this JSON format and the results are parsed by the agent below (including a link to the invoice): {"invoiceStatus": "open","invoiceURL": "https://invoice.stripe.com/i/acct_1NBOLuKVZbzw7QA5/test_YWNjdF8xTkJPTHVLVlpienc3UUE1LF9SbGJlZ2xLMjhlc3lxNzFkVVBXbkswOUlFa2Rna1RxLDEzMDAwMTY4Nw0200RLeJRMlw?s=ap","reference": "F9B01CD7-0001"}',
-            "agent: Great! I've generated your invoice for your trains to the Manchester City match on the 10th of May. You can view and pay your invoice at this link: https://invoice.stripe.com/i/acct_1NBOLuKVZbzw7QA5/test_YWNjdF8xTkJPTHVLVlpienc3UUE1LF9SbGJlZ2xLMjhlc3lxNzFkVVBXbkswOUlFa2Rna1RxLDEzMDAwMTY4Nw0200RLeJRMlw?s=ap <this is the end of the chat>",
+            "user: I want to create a simple melody",
+            "agent: I'd be happy to help you create a simple melody! I can convert a sequence of notes to MIDI format that the frontend can play. Would you like to specify the notes and durations yourself, or would you like me to suggest a simple pattern?",
+            "user: Can you suggest a pattern for a happy tune?",
+            "agent: Of course! For a happy tune, let's create a simple C major melody. Here's what I suggest: I'll create a sequence with these notes: C4 (60), E4 (64), G4 (67), C5 (72), G4 (67), E4 (64), C4 (60), with quarter and eighth note durations to give it a cheerful bounce. Would you like me to generate this MIDI sequence for you?",
+            "user: Yes, please!",
+            "user_confirmed_tool_run: <user clicks confirm on MidiCreationTool>",
+            'tool_result: {"file_id": "MIDI-20250704-a1b2c3d4", "title": "Happy C Major Melody", "tempo": 120, "midi_base64": "TVRoZAAAAAYAAQAEA8BNVHJrAAAATwD/UQMHoSAA/1gEBAIYCACBAIEAnEAgAJxALAA8QCCcQCwAP0AgnEAsAENAIJxALABIQCCcQCwAQ0AgnEAsAD9AIJxALAA8QCCQAFgA/y8A", "note_count": 7, "created_at": "2025-07-04 10:15:30", "format_details": "MIDI format 0, single track", "notes_summary": [{"note": 60, "duration": 0.25}, {"note": 64, "duration": 0.25}, {"note": 67, "duration": 0.25}, {"note": 72, "duration": 0.5}, {"note": 67, "duration": 0.25}, {"note": 64, "duration": 0.25}, {"note": 60, "duration": 0.25}]}',
+            "agent: I've created a happy C major melody for you! You can see and play the melody as colorful bubbles in the player above. Each bubble represents a note, with larger bubbles indicating longer durations. The sequence has 7 notes at a tempo of 120 BPM. Click the play button to hear the melody! Would you like to create another melody or make adjustments to this one?",
+            "user: Can you create a simple scale that goes up and down?",
+            "agent: I'd be happy to create a simple scale that goes up and down for you! I'll create a C major scale (C4 to C5) that ascends and then descends. Each note will be a quarter note (0.25 duration). Would you like me to generate this MIDI sequence for you?",
+            "user: Yes, please generate it",
+            "user_confirmed_tool_run: <user clicks confirm on MidiCreationTool>",
+            'tool_result: {"file_id": "MIDI-20250704-b5f7e9d1", "title": "C Major Scale Up and Down", "tempo": 120, "midi_base64": "TVRoZAAAAAYAAQAEA8BNVHJrAAAAdQD/UQMHoSAA/1gEBAIYCACSAIEAnEAgAJxALAA8QCCcQCwAPkAgnEAsAEBAIJxALABCQCCcQCwAREAgnEAsAEVAIJxALABHQCCcQCwAQ0AgnEAsAENAIJxALABCQCCcQCwAQEAgnEAsAD5AIJxALAA8QCCQAFgA/y8A", "note_count": 15, "created_at": "2025-07-04 10:18:45", "format_details": "MIDI format 0, single track", "notes_summary": [{"note": 60, "duration": 0.25}, {"note": 62, "duration": 0.25}, {"note": 64, "duration": 0.25}, {"note": 65, "duration": 0.25}, {"note": 67, "duration": 0.25}, {"note": "...", "duration": "..."}]}',
+            "agent: I've created a C major scale that goes up and down! The bubble player shows the sequence where each bubble represents a note - you can see how they increase in pitch (going up the scale) and then decrease (coming down). The melody contains 15 notes, including all the notes of the C major scale ascending (C4, D4, E4, F4, G4, A4, B4, C5) and then descending (C5, B4, A4, G4, F4, E4, D4, C4). Click the play button to hear it! Would you like to try creating something else?",
+            "user: Can you tell me about music theory?",
+            "user_confirmed_tool_run: <user clicks confirm on VanillaTool>",
+            'tool_result: {"response_id": "VANILLA-20250704101822", "query": "Can you tell me about music theory?", "response": "I received your request: \'Can you tell me about music theory?\'. However, I don\'t have a specialized tool for this specific task. I\'ll do my best to help using my general knowledge.", "timestamp": "2025-07-04 10:18:22"}',
+            "agent: Music theory is the study of the practices and possibilities of music. It encompasses the elements of music - rhythm, harmony, melody, structure, and expression. The basic components include: 1) Notes and scales: The fundamental pitches and their organization into sequences, 2) Intervals: The relationships between pitches, 3) Chords: Multiple notes played simultaneously, 4) Key signatures and tonality: The organization of music around central pitches, and 5) Rhythm and meter: The organization of music in time. Would you like me to explain any specific aspect of music theory in more detail?",
         ]
     ),
-)
-
-# unused
-goal_event_flight_invoice = AgentGoal(
-    tools=[
-        find_events_tool,
-        search_flights_tool,
-        create_invoice_tool,
-    ],
-    description="Help the user gather args for these tools in order: "
-    "1. FindEvents: Find an event to travel to "
-    "2. SearchFlights: search for a flight around the event dates "
-    "3. CreateInvoice: Create a simple invoice for the cost of that flight ",
-    starter_prompt="Welcome me, give me a description of what you can do, then ask me for the details you need to do your job",
-    example_conversation_history="\n ".join(
-        [
-            "user: I'd like to travel to an event",
-            "agent: Sure! Let's start by finding an event you'd like to attend. I know about events in Australia and New Zealand cities. Could you tell me which city and month you're interested in?",
-            "user: sydney in may please",
-            "agent: Great! Let's find an events in Sydney in May.",
-            "user_confirmed_tool_run: <user clicks confirm on FindEvents tool>",
-            "tool_result: { 'event_name': 'Vivid Sydney', 'event_date': '2023-05-01' }",
-            "agent: Found an event! There's Vivid Sydney on May 1 2025, ending on May 14 2025. Would you like to search for flights around these dates?",
-            "user: Yes, please",
-            "agent: Let's search for flights around these dates. Could you provide your departure city?",
-            "user: San Francisco",
-            "agent: Thanks, searching for flights from San Francisco to Sydney around 2023-02-25 to 2023-02-28.",
-            "user_confirmed_tool_run: <user clicks confirm on SearchFlights tool>"
-            'tool_result: results including {"flight_number": "CX101", "return_flight_number": "CX102", "price": 850.0}',
-            "agent: Found some flights! The cheapest is CX101 for $850. Would you like to generate an invoice for this flight?",
-            "user_confirmed_tool_run: <user clicks confirm on CreateInvoice tool>",
-            'tool_result: { "status": "success", "invoice": { "flight_number": "CX101", "amount": 850.0 }, invoiceURL: "https://example.com/invoice" }',
-            "agent: Invoice generated! Here's the link: https://example.com/invoice",
-        ]
-    ),
-)
+) 
