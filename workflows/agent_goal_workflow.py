@@ -21,7 +21,8 @@ with workflow.unsafe.imports_passed_through():
     )
 
 # Constants
-MAX_TURNS_BEFORE_CONTINUE = 250
+MAX_TURNS_BEFORE_CONTINUE = 200  # Reduced from 250 to trigger continue-as-new more frequently for testing
+WORKFLOW_ID = "agent-workflow"  # Constant workflow ID used by the application
 
 class ToolData(TypedDict, total=False):
     next: NextStep
@@ -41,32 +42,50 @@ class AgentGoalWorkflow:
         self.tool_data: Optional[ToolData] = None
         self.confirm: bool = False
         self.tool_results: List[Dict[str, Any]] = []
+        self.continued_from_previous: bool = False
 
     @workflow.run
     async def run(self, combined_input: CombinedInput) -> str:
         """Main workflow execution method."""
         params = combined_input.tool_params
         agent_goal = combined_input.agent_goal
-
+        workflow.logger.info(f"Starting workflow with ID: {workflow.info().workflow_id}")
+        
+        # Check if this is a continuation of a previous workflow
         if params and params.conversation_summary:
+            self.continued_from_previous = True
+            self.add_message("system", {
+                "type": "continuation",
+                "message": "Continuing conversation from previous session"
+            })
             self.add_message("conversation_summary", params.conversation_summary)
             self.conversation_summary = params.conversation_summary
+            workflow.logger.info("Continuing workflow with existing conversation summary")
 
+        # Restore the prompt queue if available
         if params and params.prompt_queue:
-            self.prompt_queue.extend(params.prompt_queue)
+            if isinstance(params.prompt_queue, list):
+                self.prompt_queue.extend(params.prompt_queue)
+            else:
+                self.prompt_queue.extend([params.prompt_queue])
+            workflow.logger.info(f"Restored {len(self.prompt_queue)} items to prompt queue")
 
         waiting_for_confirm = False
         current_tool = None
 
         while True:
+            # Wait for a signal to arrive (prompt, confirm, or end_chat)
             await workflow.wait_condition(
                 lambda: bool(self.prompt_queue) or self.chat_ended or self.confirm
             )
 
+            # Handle end_chat signal (triggered by New Chat button)
             if self.chat_ended:
-                workflow.logger.info("Chat ended.")
+                workflow.logger.info("Chat ended explicitly by user action.")
+                # No continue-as-new here, we just exit with the current history
                 return f"{self.conversation_history}"
 
+            # Handle confirm signal
             if self.confirm and waiting_for_confirm and current_tool and self.tool_data:
                 self.confirm = False
                 waiting_for_confirm = False
@@ -82,10 +101,21 @@ class AgentGoalWorkflow:
                     self.add_message,
                     self.prompt_queue
                 )
+                
+                # Check if we need to continue as new after tool execution
+                await helpers.continue_as_new_if_needed(
+                    self.conversation_history,
+                    self.prompt_queue,
+                    agent_goal,
+                    MAX_TURNS_BEFORE_CONTINUE,
+                    self.add_message
+                )
                 continue
 
+            # Handle user prompt
             if self.prompt_queue:
                 prompt = self.prompt_queue.popleft()
+                # Don't add starter prompts to the conversation history
                 if not prompt.startswith("###"):
                     self.add_message("user", prompt)
 
@@ -153,6 +183,8 @@ class AgentGoalWorkflow:
                     return str(self.conversation_history)
 
                 self.add_message("agent", tool_data)
+                
+                # Check if we need to continue as new after processing the prompt
                 await helpers.continue_as_new_if_needed(
                     self.conversation_history,
                     self.prompt_queue,
@@ -167,6 +199,7 @@ class AgentGoalWorkflow:
         if self.chat_ended:
             workflow.logger.warn(f"Message dropped due to chat closed: {prompt}")
             return
+        workflow.logger.info(f"Received user prompt: {prompt[:50]}...")
         self.prompt_queue.append(prompt)
 
     @workflow.signal
@@ -178,12 +211,23 @@ class AgentGoalWorkflow:
     @workflow.signal
     async def end_chat(self) -> None:
         """Signal handler for ending the chat session."""
+        workflow.logger.info("Received end_chat signal")
         self.chat_ended = True
 
     @workflow.query
     def get_conversation_history(self) -> ConversationHistory:
         """Query handler to retrieve the full conversation history."""
         return self.conversation_history
+
+    @workflow.query
+    def get_workflow_state(self) -> Dict[str, Any]:
+        """Query handler to get the current state of the workflow including continuation status."""
+        return {
+            "message_count": len(self.conversation_history["messages"]),
+            "waiting_for_confirm": bool(self.tool_data and self.tool_data.get("next") == "confirm"),
+            "continued_from_previous": self.continued_from_previous,
+            "max_turns_before_continue": MAX_TURNS_BEFORE_CONTINUE,
+        }
 
     @workflow.query
     def get_summary_from_history(self) -> Optional[str]:

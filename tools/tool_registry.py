@@ -1,5 +1,67 @@
 from models.tool_definitions import ToolDefinition, ToolArgument
 
+
+# Add HelpTool definition
+help_tool = ToolDefinition(
+    name="HelpTool",
+    description="Provides information about available tools and answers questions about the system.",
+    arguments=[
+        ToolArgument(
+            name="query",
+            type="string",
+            description="The help query (e.g., 'list all tools', 'how to use SearchFlights', etc.)",
+        ),
+    ],
+)
+
+# Add DefaultChatTool at the top
+default_chat_tool = ToolDefinition(
+    name="DefaultChatTool",
+    description="Processes user messages and decides whether to respond directly or trigger specialized tools. This is the main chat interface for the agent.",
+    arguments=[
+        ToolArgument(
+            name="message",
+            type="string",
+            description="The user's message to process",
+        ),
+        ToolArgument(
+            name="conversation_history",
+            type="array",
+            description="Optional array of previous conversation turns for context",
+        ),
+    ],
+)
+
+midicreationtool_tool = ToolDefinition(
+    name="MidiCreationTool",
+    description="Converts a text representation of music (a list of note-duration tuples) into MIDI messages. Each tuple contains a note value (MIDI note number 21-108, or 0 for silence) and a duration value (float between 0 and 2, where 1.0 represents a quarter note).",
+    arguments=[
+        ToolArgument(
+            name="music_text",
+            type="list",
+            description="A list of tuples where each tuple is (note, duration). 'note' is an integer (21-108 for a valid note, or 0 for silence) and 'duration' is a float (0 to 2, where 1.0 represents a quarter note).",
+        ),
+    ],
+)
+
+# JSON Array Tool definition
+json_array_tool = ToolDefinition(
+    name="CreateJsonArray",
+    description="Creates a JSON array based on a natural language prompt. The tool can interpret various types of structured data requests and generate appropriate JSON arrays.",
+    arguments=[
+        ToolArgument(
+            name="prompt",
+            type="string",
+            description="Natural language description of the JSON array to be created, such as 'Create a list of tasks', 'Generate a list of people', etc.",
+        ),
+        ToolArgument(
+            name="schema",
+            type="string",
+            description="Optional description of the expected schema for the JSON array (e.g., fields and data types).",
+        ),
+    ],
+)
+
 search_flights_tool = ToolDefinition(
     name="SearchFlights",
     description="Search for return flights from an origin to a destination within a date range (dateDepart, dateReturn).",
@@ -23,6 +85,32 @@ search_flights_tool = ToolDefinition(
             name="dateReturn",
             type="ISO8601",
             description="End of date range in human readable format, when you want to return",
+        ),
+    ],
+)
+
+# Example class-based tool definition
+example_tool_class_tool = ToolDefinition(
+    name="ExampleToolClass",
+    description="Example tool that demonstrates the class-based approach. Takes a message and returns it with a greeting.",
+    arguments=[
+        ToolArgument(
+            name="message",
+            type="string",
+            description="The message to greet (defaults to 'World')",
+        ),
+    ],
+)
+
+# Example function-based tool definition
+example_tool_function_tool = ToolDefinition(
+    name="ExampleToolFunction",
+    description="Example tool that demonstrates the function-based approach. Takes a message and returns it with a farewell.",
+    arguments=[
+        ToolArgument(
+            name="message",
+            type="string",
+            description="The message to bid farewell to (defaults to 'World')",
         ),
     ],
 )

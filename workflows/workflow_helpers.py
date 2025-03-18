@@ -101,32 +101,58 @@ async def continue_as_new_if_needed(
     max_turns: int,
     add_message_callback: callable,
 ) -> None:
-    """Handle workflow continuation if message limit is reached."""
+    """Handle workflow continuation if message limit is reached.
+    
+    This implements Temporal's continue-as-new pattern which allows a workflow to 
+    complete its current run and immediately start a new run with the same workflow ID 
+    but a fresh event history. This is useful for long-running conversations to prevent
+    the history from growing too large.
+    """
     if len(conversation_history["messages"]) >= max_turns:
-        summary_context, summary_prompt = prompt_summary_with_history(
-            conversation_history
-        )
-        summary_input = ToolPromptInput(
-            prompt=summary_prompt, context_instructions=summary_context
-        )
-        conversation_summary = await workflow.start_activity_method(
-            "ToolActivities.agent_toolPlanner",
-            summary_input,
-            schedule_to_close_timeout=LLM_ACTIVITY_SCHEDULE_TO_CLOSE_TIMEOUT,
-        )
-        workflow.logger.info(f"Continuing as new after {max_turns} turns.")
+        workflow.logger.info(f"History size reached {max_turns} turns. Preparing to continue as new.")
+        
+        # Generate a summary of the conversation for the new workflow instance
+        try:
+            summary_context, summary_prompt = prompt_summary_with_history(conversation_history)
+            summary_input = ToolPromptInput(
+                prompt=summary_prompt, context_instructions=summary_context
+            )
+            conversation_summary = await workflow.start_activity_method(
+                "ToolActivities.agent_toolPlanner",
+                summary_input,
+                schedule_to_close_timeout=LLM_ACTIVITY_SCHEDULE_TO_CLOSE_TIMEOUT,
+            )
+            workflow.logger.info("Successfully generated conversation summary for continue-as-new")
+        except Exception as e:
+            # If summarization fails, still continue but with a simpler summary
+            workflow.logger.error(f"Failed to generate summary: {str(e)}")
+            conversation_summary = {"summary": "Continued conversation from previous session"}
+        
+        # Add a message to inform the user about the transition
+        transition_message = {
+            "type": "system",
+            "content": "The conversation is continuing in a new session to maintain performance."
+        }
+        add_message_callback("system", transition_message)
+        
+        # Add the summary to the conversation history
         add_message_callback("conversation_summary", conversation_summary)
-        workflow.continue_as_new(
-            args=[
-                {
-                    "tool_params": {
-                        "conversation_summary": conversation_summary,
-                        "prompt_queue": prompt_queue,
-                    },
-                    "agent_goal": agent_goal,
-                }
-            ]
-        )
+        
+        # Create the new parameters for the continued workflow
+        workflow.logger.info(f"Continuing as new after {max_turns} turns with {len(prompt_queue)} pending prompts")
+        
+        # Use continue_as_new to start a fresh workflow with the same ID
+        # This is an atomic operation from Temporal's perspective
+        workflow.continue_as_new({
+            "tool_params": {
+                "conversation_summary": conversation_summary,
+                "prompt_queue": list(prompt_queue),  # Convert deque to list for serialization
+            },
+            "agent_goal": agent_goal,
+        })
+        
+        # Note: Any code after continue_as_new is never executed
+        # The current workflow run ends and a new one starts immediately
 
 
 def prompt_summary_with_history(
@@ -134,10 +160,20 @@ def prompt_summary_with_history(
 ) -> tuple[str, str]:
     """Generate a prompt for summarizing the conversation.
     Used only for continue as new of the workflow."""
-    history_string = format_history(conversation_history)
-    context_instructions = f"Here is the conversation history between a user and a chatbot: {history_string}"
+    # Extract the last 50 messages for a more relevant summary if history is very large
+    recent_messages = conversation_history["messages"][-50:] if len(conversation_history["messages"]) > 50 else conversation_history["messages"]
+    
+    # Format the recent history into a string
+    history_string = " ".join(str(msg["response"]) for msg in recent_messages)
+    
+    context_instructions = (
+        f"Here is the recent conversation history between a user and an AI assistant: {history_string}\n\n"
+        f"Total conversation length: {len(conversation_history['messages'])} messages."
+    )
+    
     actual_prompt = (
-        "Please produce a two sentence summary of this conversation. "
-        'Put the summary in the format { "summary": "<plain text>" }'
+        "Please produce a concise summary of this conversation that captures the main topics and context. "
+        "Include any important details that should be preserved for continuing the conversation. "
+        'Put the summary in the format { "summary": "<summary text>", "topics": ["topic1", "topic2"] }'
     )
     return (context_instructions, actual_prompt)
